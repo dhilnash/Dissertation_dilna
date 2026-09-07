@@ -1,0 +1,12 @@
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+.DS_Store
+
+verxia_app/frontend/node_modules/
+verxia_app/frontend/dist/
+
+*.pyc
+*.pyo
+*.log
