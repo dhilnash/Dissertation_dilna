@@ -20,7 +20,8 @@ MODELS_DIR = os.path.join(BASE_DIR, "models")
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 app = Flask(__name__)
-CORS(app)  # allow the React dev server (different port) to call this API
+frontend_origin = os.getenv("FRONTEND_ORIGIN", "*")
+CORS(app, resources={r"/api/*": {"origins": frontend_origin}})
 
 # Load real trained artifacts once at startup
 lr_ell = joblib.load(os.path.join(MODELS_DIR, "lr_elliptic.joblib"))
@@ -55,6 +56,11 @@ def risk_band(score: float) -> str:
 
 
 # Routes
+@app.route("/")
+def index():
+    return jsonify({"service": "Verxia API", "status": "ok", "health": "/api/health"})
+
+
 @app.route("/api/health")
 def health():
     return jsonify({"status": "ok"})
@@ -165,3 +171,4 @@ def predict():
 
 if __name__ == "__main__":
     app.run(debug=False, host="0.0.0.0", port=5001)
+
