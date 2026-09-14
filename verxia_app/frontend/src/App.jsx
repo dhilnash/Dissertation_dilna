@@ -6,8 +6,7 @@ import {
 import verxiaLogo from "./assets/verxia-logo.png";
 import "./App.css";
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5001/api";
+const API_BASE = "https://verxia-backend.onrender.com/api";
 
 const NAVY = "#1E3A5F";
 const RED = "#DC2626";
