@@ -49,23 +49,24 @@ export default function App() {
       return r.json();
     });
 
+  const tryLoadSamples = (attempt = 1) => {
   loadSamples()
     .then((data) => {
       setSamples(data);
       setSelectedId(data[0]?.id ?? "");
+      setError(null);
     })
     .catch(() => {
-      setError("Backend is waking up, retrying in a few seconds...");
-      setTimeout(() => {
-        loadSamples()
-          .then((data) => {
-            setSamples(data);
-            setSelectedId(data[0]?.id ?? "");
-            setError(null);
-          })
-          .catch(() => setError("Could not reach the backend. Please refresh the page."));
-      }, 8000);
+      if (attempt < 4) {
+        setError(`Connecting to Verxia... Attempt ${attempt} of 4`);
+        setTimeout(() => tryLoadSamples(attempt + 1), 5000);
+      } else {
+        setError("Could not reach the backend. Please refresh the page.");
+      }
     });
+};
+
+tryLoadSamples();
 
   fetch(`${API_BASE}/feature_importance/${dataset}`)
     .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
