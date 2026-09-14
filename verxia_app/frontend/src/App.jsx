@@ -39,19 +39,44 @@ export default function App() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    setPrediction(null);
-    setError(null);
-    fetch(`${API_BASE}/samples/${dataset}?n=200`)
-      .then((r) => r.json())
-      .then((data) => {
-        setSamples(data);
-        setSelectedId(data[0]?.id ?? "");
-      })
-      .catch(() => setError("Could not reach the backend. Is app.py running on port 5001?"));
+  setPrediction(null);
+  setError(null);
+  setSamples([]);
 
-    fetch(`${API_BASE}/feature_importance/${dataset}`).then((r) => r.json()).then(setImportance);
-    fetch(`${API_BASE}/risk_distribution/${dataset}`).then((r) => r.json()).then(setDistribution);
-  }, [dataset]);
+  const loadSamples = () =>
+    fetch(`${API_BASE}/samples/${dataset}?n=200`).then((r) => {
+      if (!r.ok) throw new Error(`Backend returned ${r.status}`);
+      return r.json();
+    });
+
+  loadSamples()
+    .then((data) => {
+      setSamples(data);
+      setSelectedId(data[0]?.id ?? "");
+    })
+    .catch(() => {
+      setError("Backend is waking up, retrying in a few seconds...");
+      setTimeout(() => {
+        loadSamples()
+          .then((data) => {
+            setSamples(data);
+            setSelectedId(data[0]?.id ?? "");
+            setError(null);
+          })
+          .catch(() => setError("Could not reach the backend. Please refresh the page."));
+      }, 8000);
+    });
+
+  fetch(`${API_BASE}/feature_importance/${dataset}`)
+    .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+    .then(setImportance)
+    .catch(() => {});
+
+  fetch(`${API_BASE}/risk_distribution/${dataset}`)
+    .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+    .then(setDistribution)
+    .catch(() => {});
+}, [dataset]);
 
   useEffect(() => {
     fetch(`${API_BASE}/model_comparison`).then((r) => r.json()).then(setComparison);
@@ -114,13 +139,22 @@ export default function App() {
           These are real held-out {dataset === "elliptic" ? "transactions" : "accounts"} the model has never
           been trained on, not synthetic examples.
         </p>
-        <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)} className="id-select">
-          {samples.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.id.length > 20 ? s.id.slice(0, 18) + "…" : s.id}
-            </option>
-          ))}
-        </select>
+        <select
+  value={selectedId}
+  onChange={(e) => setSelectedId(e.target.value)}
+  className="id-select"
+  disabled={samples.length === 0}
+>
+  {samples.length === 0 ? (
+    <option value="">Loading cases...</option>
+  ) : (
+    samples.map((s) => (
+      <option key={s.id} value={s.id}>
+        {s.id.length > 20 ? s.id.slice(0, 18) + "…" : s.id}
+      </option>
+    ))
+  )}
+</select>
 
         <div className="model-toggle">
           <label>
