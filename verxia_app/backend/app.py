@@ -126,48 +126,66 @@ def samples(dataset):
 
 @app.route("/api/predict", methods=["POST"])
 def predict():
-    """
-    Body: {"dataset": "elliptic"|"ethereum", "id": "<txId or Address>", "model": "rf"|"lr"}
-    Runs the REAL trained model on that REAL test-set row and returns a live prediction.
-    """
-    payload = request.get_json()
-    dataset = payload.get("dataset")
-    row_id = payload.get("id")
-    model_choice = payload.get("model", "rf")
+    try:
+        payload = request.get_json()
 
-    if dataset == "elliptic":
-        row = ell_test[ell_test["txId"].astype(str) == str(row_id)]
-        if row.empty:
-            return jsonify({"error": "id not found"}), 404
-        X = row[ELL_FEAT_COLS]
-        true_label = int(row["label"].iloc[0])
-        if model_choice == "lr":
-            score = float(lr_ell.predict_proba(scaler_ell.transform(X))[0, 1])
+        if not payload:
+            return jsonify({"error": "No JSON data received"}), 400
+
+        dataset = payload.get("dataset")
+        row_id = payload.get("id")
+        model_choice = payload.get("model", "rf")
+
+        if dataset == "elliptic":
+            row = ell_test[ell_test["txId"].astype(str) == str(row_id)]
+
+            if row.empty:
+                return jsonify({"error": "Elliptic ID not found"}), 404
+
+            X = row[ELL_FEAT_COLS]
+            true_label = int(row["label"].iloc[0])
+
+            if model_choice == "lr":
+                X_scaled = scaler_ell.transform(X)
+                score = float(lr_ell.predict_proba(X_scaled)[0, 1])
+            else:
+                score = float(rf_ell.predict_proba(X)[0, 1])
+
+        elif dataset == "ethereum":
+            row = eth_test[eth_test["Address"] == row_id]
+
+            if row.empty:
+                return jsonify({"error": "Ethereum address not found"}), 404
+
+            X = row[ETH_FEAT_COLS]
+            true_label = int(row["FLAG"].iloc[0])
+
+            if model_choice == "lr":
+                X_scaled = scaler_eth.transform(X)
+                score = float(lr_eth.predict_proba(X_scaled)[0, 1])
+            else:
+                score = float(rf_eth.predict_proba(X)[0, 1])
+
         else:
-            score = float(rf_ell.predict_proba(X)[0, 1])
+            return jsonify({
+                "error": "dataset must be 'elliptic' or 'ethereum'"
+            }), 400
 
-    elif dataset == "ethereum":
-        row = eth_test[eth_test["Address"] == row_id]
-        if row.empty:
-            return jsonify({"error": "id not found"}), 404
-        X = row[ETH_FEAT_COLS]
-        true_label = int(row["FLAG"].iloc[0])
-        if model_choice == "lr":
-            score = float(lr_eth.predict_proba(scaler_eth.transform(X))[0, 1])
-        else:
-            score = float(rf_eth.predict_proba(X)[0, 1])
-    else:
-        return jsonify({"error": "dataset must be 'elliptic' or 'ethereum'"}), 400
+        return jsonify({
+            "id": row_id,
+            "dataset": dataset,
+            "model": model_choice,
+            "risk_score": round(score, 4),
+            "risk_band": risk_band(score),
+            "true_label": true_label,
+        })
 
-    return jsonify({
-        "id": row_id,
-        "dataset": dataset,
-        "model": model_choice,
-        "risk_score": round(score, 4),
-        "risk_band": risk_band(score),
-        "true_label": true_label,  # included for demo/viva purposes only
-    })
-
+    except Exception as e:
+        print("PREDICTION ERROR:", repr(e))
+        return jsonify({
+            "error": "Prediction failed",
+            "details": str(e)
+        }), 500
 
 if __name__ == "__main__":
     app.run(debug=False, host="0.0.0.0", port=5001)
